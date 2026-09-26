@@ -52,7 +52,7 @@ jobs:
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-       - name: Force Java 17
+      - name: Force Java 17
         run: |
           cat > "$PROJECT_DIR/force-java17.gradle" <<'EOF'
           allprojects {
