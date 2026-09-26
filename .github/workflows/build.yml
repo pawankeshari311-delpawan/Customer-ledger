@@ -1,4 +1,3 @@
-
 name: Build Customer Ledger APK
 
 on:
@@ -20,20 +19,25 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK packages
-        run: |
-          yes | sdkmanager --licenses
-          sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+        with:
+          cmdline-tools-version: "12266719"
+          accept-android-sdk-licenses: true
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
 
       - name: Extract project
         run: |
           set -eux
 
           ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+
           if [ -z "$ZIP_FILE" ]; then
             echo "Project ZIP not found in repository root"
             exit 1
@@ -43,10 +47,10 @@ jobs:
           mkdir -p project
           unzip -q "$ZIP_FILE" -d project
 
-          echo "Extracted files:"
-          find project -maxdepth 3 -type f | sed -n '1,60p'
-
-          PROJECT_DIR=$(find project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+          PROJECT_DIR=$(find project -type f \
+            \( -name "settings.gradle" -o \
+               -name "settings.gradle.kts" \) \
+            | head -n 1 | xargs dirname)
 
           if [ -z "$PROJECT_DIR" ]; then
             echo "No Android project found inside ZIP"
@@ -54,26 +58,15 @@ jobs:
           fi
 
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Using project dir: $PROJECT_DIR"
 
       - name: Build APK
-        env:
-          ANDROID_HOME: ${{ env.ANDROID_HOME }}
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
           set -eux
           cd "$PROJECT_DIR"
-
-          if [ -f "./gradlew" ]; then
-            chmod +x ./gradlew
-            ./gradlew assembleDebug
-          else
-            gradle assembleDebug
-          fi
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Customer-Ledger-APK
-          path: |
-            project/**/build/outputs/apk/debug/*.apk
+          path: project/**/build/outputs/apk/debug/*.apk
