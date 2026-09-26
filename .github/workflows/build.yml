@@ -1,5 +1,4 @@
 
-
 name: Build Customer Ledger APK
 
 on:
@@ -22,25 +21,33 @@ jobs:
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
 
-      - name: Install Android SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: "8.9"
 
       - name: Extract project
         run: |
-          unzip -q CustomerLedger_Android_Project_v1.1.zip -d project
-          ROOT=$(find project -name settings.gradle.kts -print -quit | xargs dirname)
-          echo "PROJECT_ROOT=$ROOT" >> "$GITHUB_ENV"
+          ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
+          if [ -z "$ZIP_FILE" ]; then
+            echo "Project ZIP not found in repository root"
+            exit 1
+          fi
+          mkdir project
+          unzip -q "$ZIP_FILE" -d project
+          find project -name build.gradle.kts
 
       - name: Build APK
-        run: gradle -p "$PROJECT_ROOT" assembleDebug
+        run: |
+          cd project
+          PROJECT_DIR=$(dirname "$(find . -name settings.gradle.kts | head -n 1)")
+          cd "$PROJECT_DIR"
+          gradle assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: CustomerLedger-APK
-          path: project/**/app/build/outputs/apk/debug/app-debug.apk
+          name: Customer-Ledger-APK
+          path: project/**/build/outputs/apk/debug/*.apk
