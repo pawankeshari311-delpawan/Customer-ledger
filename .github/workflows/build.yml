@@ -23,6 +23,7 @@ jobs:
 
       - name: Install Android SDK packages
         run: |
+          yes | sdkmanager --licenses
           sdkmanager --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle
@@ -30,24 +31,49 @@ jobs:
 
       - name: Extract project
         run: |
+          set -eux
+
           ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
           if [ -z "$ZIP_FILE" ]; then
             echo "Project ZIP not found in repository root"
             exit 1
           fi
-          mkdir project
+
+          rm -rf project
+          mkdir -p project
           unzip -q "$ZIP_FILE" -d project
-          find project -name build.gradle.kts
+
+          echo "Extracted files:"
+          find project -maxdepth 3 -type f | sed -n '1,60p'
+
+          PROJECT_DIR=$(find project -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) | head -n 1 | xargs dirname)
+
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "No Android project found inside ZIP"
+            exit 1
+          fi
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Using project dir: $PROJECT_DIR"
 
       - name: Build APK
+        env:
+          ANDROID_HOME: ${{ env.ANDROID_HOME }}
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
         run: |
-          cd project
-          PROJECT_DIR=$(dirname "$(find . -name settings.gradle.kts | head -n 1)")
+          set -eux
           cd "$PROJECT_DIR"
-          gradle assembleDebug
+
+          if [ -f "./gradlew" ]; then
+            chmod +x ./gradlew
+            ./gradlew assembleDebug
+          else
+            gradle assembleDebug
+          fi
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Customer-Ledger-APK
-          path: project/**/build/outputs/apk/debug/*.apk
+          path: |
+            project/**/build/outputs/apk/debug/*.apk
