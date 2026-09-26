@@ -1,4 +1,4 @@
-name: Build Customer Ledger APK
+ame: Build Customer Ledger APK
 
 on:
   workflow_dispatch:
