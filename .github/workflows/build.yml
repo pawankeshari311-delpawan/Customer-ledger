@@ -1,3 +1,5 @@
+
+
 name: Build Customer Ledger APK
 
 on:
@@ -17,22 +19,20 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      # Removed the failing "Set up Android SDK" step completely.
-      # GitHub runners already have it, and Gradle will fetch anything missing.
-
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Extract project
+      - name: Extract Android project
+        shell: bash
         run: |
           set -eux
 
           ZIP_FILE=$(find . -maxdepth 1 -name "*.zip" | head -n 1)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "Project ZIP not found in repository root"
+            echo "No ZIP file found in repository root"
             exit 1
           fi
 
@@ -40,40 +40,35 @@ jobs:
           mkdir -p project
           unzip -q "$ZIP_FILE" -d project
 
-          PROJECT_DIR=$(find project -type f \
-            \( -name "settings.gradle" -o \
-               -name "settings.gradle.kts" \) \
-            | head -n 1 | xargs dirname)
+          SETTINGS=$(find project -type f \
+            \( -name "settings.gradle" \
+            -o -name "settings.gradle.kts" \) \
+            | head -n 1)
 
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "No Android project found inside ZIP"
+          if [ -z "$SETTINGS" ]; then
+            echo "Android project settings file not found"
             exit 1
           fi
 
+          PROJECT_DIR=$(dirname "$SETTINGS")
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
-      - name: Force Java 17
-        run: |
-          cat > "$PROJECT_DIR/force-java17.gradle" <<'EOF'
-          allprojects {
-              tasks.withType(
-                  org.gradle.api.tasks.compile.JavaCompile
-              ).configureEach {
-                  sourceCompatibility = "17"
-                  targetCompatibility = "17"
-              }
-          }
-          EOF
+          echo "Found project at: $PROJECT_DIR"
 
       - name: Build APK
+        shell: bash
         run: |
           set -eux
-          gradle -p "$PROJECT_DIR" \
-            -I "$PROJECT_DIR/force-java17.gradle" \
-            assembleDebug
+
+          cd "$PROJECT_DIR"
+
+          gradle assembleDebug \
+            --no-daemon \
+            -Pkotlin.jvm.target.validation.mode=warning
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: Customer-Ledger-APK
           path: project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
